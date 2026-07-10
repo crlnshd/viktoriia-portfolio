@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build viktoriia-portfolio.html from template.html.
+"""Build index.html from template.html.
 
 Auto-discovers projects from the projects/ folder and inlines every asset
 (fonts, portrait, project images) as base64 data URIs, so the output is a
