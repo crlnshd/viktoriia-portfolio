@@ -1,16 +1,25 @@
 #!/usr/bin/env python3
-"""Build index.html from template.html.
+"""Build the portfolio into a deployable dist/ folder.
 
-Auto-discovers projects from the projects/ folder and inlines every asset
-(fonts, portrait, project images) as base64 data URIs, so the output is a
-single self-contained HTML file you can host anywhere.
+Produces:
+  dist/index.html   — a small HTML file (fonts + portrait inlined; those are tiny)
+  dist/assets/…     — every project photo copied out as a real file, referenced
+                      by a relative URL and lazy-loaded in the browser.
 
-Add a project:
-  1. Make a new folder in projects/ named "<order>-<slug>", e.g. "07-my-work".
-     Folders are sorted by name, so the number prefix controls display order.
+Why not one big self-contained file? Inlining ~30MB of photos as base64 makes a
+~43MB HTML that the browser must download in full before it can show anything —
+that's the 1-2 minute first load. With external + lazy-loaded images the HTML is
+a couple hundred KB, paints instantly, and photos stream in on demand.
+
+Deploy: push the CONTENTS of dist/ to your GitHub Pages repo (index.html and the
+assets/ folder side by side).
+
+Add / edit a project:
+  1. Featured "Selected Work" -> projects/<order>-<slug>/
+     Browse grid          -> categories/<order>-<slug>/
+     Folders sort by name; the number prefix controls order.
   2. Drop a meta.json inside: {"title", "tag", "desc", "url"}.
-  3. Drop the slide images inside (jpg/jpeg/png/webp). They are shown in
-     filename order, so name them 01.jpg, 02.jpg, ... to control the sequence.
+  3. Drop images (jpg/png/webp…), named 01, 02, … for the order you want.
   4. Run: python3 build.py
 
 Usage: python3 build.py
@@ -19,9 +28,12 @@ import base64
 import json
 import mimetypes
 import os
+import shutil
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-OUT = os.path.join(HERE, "index.html")
+DIST = os.path.join(HERE, "dist")
+ASSETS = os.path.join(DIST, "assets")
+OUT = os.path.join(DIST, "index.html")
 PROJECTS_DIR = os.path.join(HERE, "projects")
 CATEGORIES_DIR = os.path.join(HERE, "categories")
 
@@ -34,10 +46,20 @@ def data_uri(path: str, mime: str | None = None) -> str:
         return f"data:{mime};base64," + base64.b64encode(f.read()).decode()
 
 
-def load_project(folder: str, name: str, require_images: bool = True) -> dict:
-    """Read one project folder (meta.json + images) into a dict.
-    With require_images=False an empty folder is allowed (e.g. a placeholder
-    category like K Villas that has no photos yet)."""
+def emit_image(src: str, rel_dir: str) -> str:
+    """Copy an image into dist/assets/<rel_dir>/ and return its relative URL."""
+    out_dir = os.path.join(ASSETS, rel_dir)
+    os.makedirs(out_dir, exist_ok=True)
+    fn = os.path.basename(src)
+    shutil.copy2(src, os.path.join(out_dir, fn))
+    return f"assets/{rel_dir}/{fn}"
+
+
+def load_project(folder: str, name: str, rel_dir: str,
+                 require_images: bool = True) -> dict:
+    """Read one project folder (meta.json + images) into a dict, copying its
+    images out to dist/assets/<rel_dir>/. With require_images=False an empty
+    folder is allowed (a placeholder like K Villas with no photos yet)."""
     meta_path = os.path.join(folder, "meta.json")
     if not os.path.exists(meta_path):
         raise SystemExit(f"{name}: missing meta.json")
@@ -55,7 +77,7 @@ def load_project(folder: str, name: str, require_images: bool = True) -> dict:
     if not image_files and require_images:
         raise SystemExit(f"{name}: no images found in folder")
 
-    images = [data_uri(os.path.join(folder, fn)) for fn in image_files]
+    images = [emit_image(os.path.join(folder, fn), rel_dir) for fn in image_files]
     return {
         "title": meta["title"],
         "tag": meta["tag"],
@@ -75,7 +97,7 @@ def load_projects() -> list[dict]:
         folder = os.path.join(PROJECTS_DIR, name)
         if not os.path.isdir(folder) or name.startswith("."):
             continue
-        p = load_project(folder, name, require_images=False)
+        p = load_project(folder, name, f"featured/{name}", require_images=False)
         projects.append(p)
         n = len(p["images"])
         print(f"  + {name} ({n} image{'s' if n != 1 else ''})")
@@ -98,7 +120,8 @@ def load_categories() -> list[dict]:
         folder = os.path.join(CATEGORIES_DIR, name)
         if not os.path.isdir(folder) or name.startswith("."):
             continue
-        p = load_project(folder, f"categories/{name}", require_images=False)
+        p = load_project(folder, f"categories/{name}", f"categories/{name}",
+                          require_images=False)
         categories.append(p)
         n = len(p["images"])
         print(f"  # {p['title']}: {n} image{'s' if n != 1 else ''}"
@@ -111,6 +134,13 @@ def main() -> None:
     with open(os.path.join(HERE, "template.html"), encoding="utf-8") as f:
         tpl = f.read()
 
+    # fresh dist/
+    if os.path.exists(DIST):
+        shutil.rmtree(DIST)
+    os.makedirs(ASSETS, exist_ok=True)
+
+    # fonts + portrait are tiny (~200KB total) → keep inline to avoid FOUT and
+    # extra round-trips.
     tpl = tpl.replace("{{F_SYNE}}", data_uri(os.path.join(HERE, "fonts/Syne.woff2"), "font/woff2"))
     tpl = tpl.replace("{{F_INSTR}}", data_uri(os.path.join(HERE, "fonts/InstrumentSans.woff2"), "font/woff2"))
     tpl = tpl.replace("{{PORTRAIT}}", data_uri(os.path.join(HERE, "images/profile-photo.jpg")))
@@ -132,9 +162,20 @@ def main() -> None:
 
     with open(OUT, "w", encoding="utf-8") as f:
         f.write(tpl)
+
+    # GitHub Pages: skip Jekyll so nothing gets mangled.
+    open(os.path.join(DIST, ".nojekyll"), "w").close()
+
     cat_imgs = sum(len(c["images"]) for c in categories)
-    print(f"OK {OUT} ({os.path.getsize(OUT)} bytes, {len(projects)} featured, "
-          f"{len(categories)} categories, {cat_imgs} category images)")
+    assets_bytes = sum(
+        os.path.getsize(os.path.join(dp, f))
+        for dp, _, fns in os.walk(ASSETS) for f in fns
+    )
+    print(f"OK {OUT} ({os.path.getsize(OUT) // 1024} KB HTML) + "
+          f"assets/ ({assets_bytes // (1024 * 1024)} MB, "
+          f"{len(projects)} featured, {len(categories)} categories, "
+          f"{cat_imgs} category images)")
+    print(f"Deploy: push the contents of {DIST}/ to your GitHub Pages repo.")
 
 
 if __name__ == "__main__":

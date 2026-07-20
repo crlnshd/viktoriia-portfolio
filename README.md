@@ -23,9 +23,15 @@ Live artifact: https://claude.ai/code/artifact/64a4e8e6-d55e-480c-8ba6-da9f8cf96
 - `images/profile-photo.jpg` — the hero portrait. Swap the file (keep the name)
   and rebuild.
 - `fonts/` — Syne and Instrument Sans (latin subsets, woff2, OFL-licensed).
-- `build.py` — auto-discovers projects and inlines every asset as base64.
-- `viktoriia-portfolio.html` — the built, fully self-contained output (~3.8MB).
-  Host it as-is on any static host, or open directly in a browser.
+- `build.py` — auto-discovers projects and builds the deployable `dist/` folder.
+- `dist/` — the **built output** (generated; safe to delete, `build.py` recreates
+  it). Contains `index.html` (~300KB, fonts + portrait inlined) and `assets/`
+  (the photos, copied out as real files and lazy-loaded). This is what you deploy.
+
+  > Photos are **external files**, not inlined. An earlier version base64-inlined
+  > every image into one ~43MB HTML — that's why the live site took 1-2 minutes to
+  > first load. External + lazy loading makes the HTML tiny and paints instantly;
+  > photos stream in as you scroll / open a gallery.
 
 ## Projects
 
@@ -67,6 +73,24 @@ then `python3 build.py`. The count updates automatically.
 ```sh
 python3 build.py
 ```
+
+Rebuilds `dist/` from scratch each time.
+
+## Deploy (GitHub Pages)
+
+The live site is https://crlnshd.github.io/viktoriia-portfolio/ . Deploy the
+**contents of `dist/`** (the `index.html`, the `assets/` folder, and `.nojekyll`)
+to the repo/branch GitHub Pages serves. In a clone of that repo:
+
+```sh
+python3 build.py                     # regenerate dist/
+rm -rf assets index.html .nojekyll   # clear the old build at the repo root
+cp -R dist/. .                       # copy the new build in (note the trailing /.)
+git add -A && git commit -m "Update site" && git push
+```
+
+(Adjust if Pages serves from `/docs` or the `gh-pages` branch instead of the
+repo root — copy `dist/`'s contents into that location instead.)
 
 ## TODO / placeholders
 
