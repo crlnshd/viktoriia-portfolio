@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Build the portfolio into a deployable dist/ folder.
+"""Build the portfolio into a deployable docs/ folder.
 
 Produces:
-  dist/index.html   — a small HTML file (fonts + portrait inlined; those are tiny)
-  dist/assets/…     — every project photo copied out as a real file, referenced
+  docs/index.html   — a small HTML file (fonts + portrait inlined; those are tiny)
+  docs/assets/…     — every project photo copied out as a real file, referenced
                       by a relative URL and lazy-loaded in the browser.
 
 Why not one big self-contained file? Inlining ~30MB of photos as base64 makes a
@@ -11,8 +11,8 @@ Why not one big self-contained file? Inlining ~30MB of photos as base64 makes a
 that's the 1-2 minute first load. With external + lazy-loaded images the HTML is
 a couple hundred KB, paints instantly, and photos stream in on demand.
 
-Deploy: push the CONTENTS of dist/ to your GitHub Pages repo (index.html and the
-assets/ folder side by side).
+Deploy (GitHub Pages): commit docs/ and set Pages to "main branch, /docs folder".
+The site serves from the repo root URL.
 
 Add / edit a project:
   1. Featured "Selected Work" -> projects/<order>-<slug>/
@@ -31,7 +31,9 @@ import os
 import shutil
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-DIST = os.path.join(HERE, "dist")
+# GitHub Pages can serve from the repo root or a /docs folder (not /dist), so we
+# build into docs/ and point Pages at "main /docs".
+DIST = os.path.join(HERE, "docs")
 ASSETS = os.path.join(DIST, "assets")
 OUT = os.path.join(DIST, "index.html")
 PROJECTS_DIR = os.path.join(HERE, "projects")
@@ -175,7 +177,8 @@ def main() -> None:
           f"assets/ ({assets_bytes // (1024 * 1024)} MB, "
           f"{len(projects)} featured, {len(categories)} categories, "
           f"{cat_imgs} category images)")
-    print(f"Deploy: push the contents of {DIST}/ to your GitHub Pages repo.")
+    print(f"Deploy: commit {os.path.basename(DIST)}/ and set GitHub Pages to "
+          f"'main branch, /docs folder'.")
 
 
 if __name__ == "__main__":
