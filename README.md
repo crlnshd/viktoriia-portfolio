@@ -33,7 +33,7 @@ Live artifact: https://claude.ai/code/artifact/64a4e8e6-d55e-480c-8ba6-da9f8cf96
   > first load. External + lazy loading makes the HTML tiny and paints instantly;
   > photos stream in as you scroll / open a gallery.
 
-## Projects
+## Projects (Selecter WORK)
 
 Each project is a folder in `projects/` named `<order>-<slug>`, e.g.
 `01-devtalk`. Folders are sorted by name, so the **number prefix controls the
